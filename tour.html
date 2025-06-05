@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive SOC Room - VIBE Enhanced</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0f1419 0%, #1a2332 100%);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+            color: white;
+        }
+        
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 20, 40, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(64, 224, 208, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            max-width: 350px;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        #info-panel h3 {
+            color: #40E0D0;
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        #info-panel p {
+            margin: 8px 0;
+            font-size: 14px;
+            line-height: 1.4;
+            color: #e0e6ed;
+        }
+        
+        .role-badge {
+            display: inline-block;
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin: 4px 4px 4px 0;
+        }
+        
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0;
+        }
+        
+        .feature-list li {
+            padding: 4px 0;
+            font-size: 13px;
+            color: #b8c5d1;
+        }
+        
+        .feature-list li:before {
+            content: "▸ ";
+            color: #40E0D0;
+            font-weight: bold;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 20, 40, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(64, 224, 208, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            z-index: 100;
+        }
+        
+        .control-button {
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .control-button.active {
+            background: linear-gradient(45deg, #40E0D0 0%, #48CAE4 100%);
+        }
+        
+        #title {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            text-align: right;
+            z-index: 100;
+        }
+        
+        #title h1 {
+            color: #40E0D0;
+            font-size: 24px;
+            margin: 0;
+            font-weight: 700;
+            text-shadow: 0 2px 10px rgba(64, 224, 208, 0.3);
+        }
+        
+        #title p {
+            color: #b8c5d1;
+            font-size: 14px;
+            margin: 5px 0 0 0;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #40E0D0;
+            font-size: 18px;
+            z-index: 1000;
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div class="loading pulse">Loading Interactive SOC Room...</div>
+        
+        <div id="title">
+            <h1>VIBE-Enhanced SOC</h1>
+            <p>Interactive 3D Visualization</p>
+        </div>
+        
+        <div id="info-panel">
+            <h3>SOC Room Overview</h3>
+            <p>Click on workstations to explore each position's VIBE integration and capabilities.</p>
+            <div class="role-badge">Interactive Tour</div>
+        </div>
+        
+        <div id="controls">
+            <button class="control-button active" onclick="resetView()">Reset View</button>
+            <button class="control-button" onclick="toggleWireframe()">Toggle Wireframe</button>
+            <button class="control-button" onclick="autoTour()">Auto Tour</button>
+        </div>
+    </div>
+
+    <script>
+        let scene, camera, renderer, raycaster, mouse;
+        let workstations = [];
+        let isWireframe = false;
+        let autoTourActive = false;
+        let tourStep = 0;
+        
+        const positions = [
+            {
+                name: "Lead Security Analyst",
+                position: "Position 1 - Center Front",
+                color: 0x40E0D0,
+                description: "Central command with optimal video wall access and emergency presets",
+                features: ["Dual Security Access", "Emergency Presets", "Microsoft Teams Integration"],
+                vibeIntegration: "Uses predefined prompt templates for system alerts and quick preset recall",
+                x: 0, z: 2
+            },
+            {
+                name: "Incident Response Specialist", 
+                position: "Position 2 - Left Wing",
+                color: 0x667eea,
+                description: "Specialized threat detection with AI-assisted analysis capabilities",
+                features: ["Threat Detection", "AI-generated Reports", "External Coordination"],
+                vibeIntegration: "Structured prompts for incident escalation and automated documentation",
+                x: -3, z: 1
+            },
+            {
+                name: "Network Operations Analyst",
+                position: "Position 3 - Right Center", 
+                color: 0xFF8C00,
+                description: "System monitoring with predictive maintenance and diagnostic tools",
+                features: ["Alert Broadcasts", "Diagnostic Tools", "Predictive Maintenance"],
+                vibeIntegration: "Technical prompts for system diagnostics and automated health reporting",
+                x: 3, z: 1
+            },
+            {
+                name: "Communications Coordinator",
+                position: "Position 4 - Right Wing",
+                color: 0x764ba2,
+                description: "Multi-channel communication hub with emergency broadcast capabilities", 
+                features: ["System Monitoring", "Emergency Broadcasts", "Multi-channel Coordination"],
+                vibeIntegration: "Communication templates and automated alert distribution systems",
+                x: 4, z: -1
+            }
+        ];
+
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0e1a);
+            scene.fog = new THREE.Fog(0x0a0e1a, 10, 50);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 8, 8);
+            camera.lookAt(0, 0, 0);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('container').appendChild(renderer.domElement);
+            
+            // Raycaster for interactions
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            
+            createRoom();
+            createLighting();
+            createWorkstations();
+            
+            // Event listeners
+            renderer.domElement.addEventListener('click', onMouseClick);
+            renderer.domElement.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('resize', onWindowResize);
+            
+            // Hide loading
+            document.querySelector('.loading').style.display = 'none';
+            
+            animate();
+        }
+        
+        function createRoom() {
+            // Floor
+            const floorGeometry = new THREE.PlaneGeometry(20, 15);
+            const floorMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x1a2332,
+                transparent: true,
+                opacity: 0.8
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+            
+            // Video Wall
+            const wallGeometry = new THREE.PlaneGeometry(8, 3);
+            const wallMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x2a3f5f,
+                emissive: 0x001122
+            });
+            const videoWall = new THREE.Mesh(wallGeometry, wallMaterial);
+            videoWall.position.set(0, 2, -6);
+            scene.add(videoWall);
+            
+            // Video Wall Border
+            const borderGeometry = new THREE.EdgesGeometry(wallGeometry);
+            const borderMaterial = new THREE.LineBasicMaterial({ color: 0x40E0D0 });
+            const border = new THREE.LineSegments(borderGeometry, borderMaterial);
+            border.position.copy(videoWall.position);
+            scene.add(border);
+            
+            // Consultation Area
+            const consultGeometry = new THREE.CylinderGeometry(1.5, 1.5, 0.1, 8);
+            const consultMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x2d3748,
+                transparent: true,
+                opacity: 0.6 
+            });
+            const consultArea = new THREE.Mesh(consultGeometry, consultMaterial);
+            consultArea.position.set(-2, 0.05, -2);
+            scene.add(consultArea);
+            
+            // Training Corner
+            const trainGeometry = new THREE.BoxGeometry(2, 0.1, 2);
+            const trainMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x4a5568,
+                transparent: true,
+                opacity: 0.6 
+            });
+            const trainCorner = new THREE.Mesh(trainGeometry, trainMaterial);
+            trainCorner.position.set(5, 0.05, -4);
+            scene.add(trainCorner);
+        }
+        
+        function createLighting() {
+            // Ambient light
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+            scene.add(ambientLight);
+            
+            // Main directional light
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 5);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+            
+            // Accent lights for each position
+            positions.forEach(pos => {
+                const light = new THREE.PointLight(pos.color, 0.6, 8);
+                light.position.set(pos.x, 3, pos.z);
+                scene.add(light);
+            });
+            
+            // Video wall glow
+            const wallLight = new THREE.PointLight(0x40E0D0, 1, 15);
+            wallLight.position.set(0, 2, -5);
+            scene.add(wallLight);
+        }
+        
+        function createWorkstations() {
+            positions.forEach((pos, index) => {
+                const group = new THREE.Group();
+                
+                // Desk
+                const deskGeometry = new THREE.BoxGeometry(2, 0.1, 1.5);
+                const deskMaterial = new THREE.MeshLambertMaterial({ color: 0x2d3748 });
+                const desk = new THREE.Mesh(deskGeometry, deskMaterial);
+                desk.position.y = 0.8;
+                desk.castShadow = true;
+                group.add(desk);
+                
+                // Chair
+                const chairGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 8);
+                const chairMaterial = new THREE.MeshLambertMaterial({ color: 0x4a5568 });
+                const chair = new THREE.Mesh(chairGeometry, chairMaterial);
+                chair.position.set(0, 0.5, 0.8);
+                group.add(chair);
+                
+                // Monitor(s)
+                const monitorCount = pos.name.includes('Lead') ? 2 : 1;
+                for(let i = 0; i < monitorCount; i++) {
+                    const monitorGeometry = new THREE.BoxGeometry(0.8, 0.5, 0.05);
+                    const monitorMaterial = new THREE.MeshLambertMaterial({ 
+                        color: 0x1a1a1a,
+                        emissive: pos.color,
+                        emissiveIntensity: 0.1
+                    });
+                    const monitor = new THREE.Mesh(monitorGeometry, monitorMaterial);
+                    monitor.position.set((i - 0.5) * 0.9, 1.2, -0.6);
+                    group.add(monitor);
+                }
+                
+                // Interactive sphere (clickable area)
+                const sphereGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+                const sphereMaterial = new THREE.MeshLambertMaterial({ 
+                    color: pos.color,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+                sphere.position.set(0, 1.5, 0);
+                sphere.userData = { positionIndex: index };
+                group.add(sphere);
+                
+                // Position the entire group
+                group.position.set(pos.x, 0, pos.z);
+                scene.add(group);
+                
+                workstations.push({group, sphere, data: pos});
+            });
+        }
+        
+        function onMouseClick(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            
+            const spheres = workstations.map(ws => ws.sphere);
+            const intersects = raycaster.intersectObjects(spheres);
+            
+            if (intersects.length > 0) {
+                const selectedWorkstation = workstations.find(ws => ws.sphere === intersects[0].object);
+                showPositionInfo(selectedWorkstation.data);
+                focusOnPosition(selectedWorkstation.data);
+            }
+        }
+        
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            
+            const spheres = workstations.map(ws => ws.sphere);
+            const intersects = raycaster.intersectObjects(spheres);
+            
+            // Reset all spheres
+            workstations.forEach(ws => {
+                ws.sphere.scale.set(1, 1, 1);
+                ws.sphere.material.opacity = 0.7;
+            });
+            
+            // Highlight hovered sphere
+            if (intersects.length > 0) {
+                intersects[0].object.scale.set(1.2, 1.2, 1.2);
+                intersects[0].object.material.opacity = 1;
+                document.body.style.cursor = 'pointer';
+            } else {
+                document.body.style.cursor = 'default';
+            }
+        }
+        
+        function showPositionInfo(posData) {
+            const infoPanel = document.getElementById('info-panel');
+            infoPanel.innerHTML = `
+                <h3>${posData.name}</h3>
+                <div class="role-badge">${posData.position}</div>
+                <p><strong>Description:</strong> ${posData.description}</p>
+                <p><strong>Key Features:</strong></p>
+                <ul class="feature-list">
+                    ${posData.features.map(feature => `<li>${feature}</li>`).join('')}
+                </ul>
+                <p><strong>VIBE Integration:</strong> ${posData.vibeIntegration}</p>
+            `;
+        }
+        
+        function focusOnPosition(posData) {
+            const targetX = posData.x;
+            const targetZ = posData.z + 4;
+            
+            // Smooth camera movement
+            const startPos = camera.position.clone();
+            const endPos = new THREE.Vector3(targetX, 6, targetZ);
+            const startTime = Date.now();
+            const duration = 1500;
+            
+            function animateCamera() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3); // Ease out cubic
+                
+                camera.position.lerpVectors(startPos, endPos, eased);
+                camera.lookAt(posData.x, 1, posData.z);
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animateCamera);
+                }
+            }
+            
+            animateCamera();
+        }
+        
+        function resetView() {
+            camera.position.set(0, 8, 8);
+            camera.lookAt(0, 0, 0);
+            
+            const infoPanel = document.getElementById('info-panel');
+            infoPanel.innerHTML = `
+                <h3>SOC Room Overview</h3>
+                <p>Click on workstations to explore each position's VIBE integration and capabilities.</p>
+                <div class="role-badge">Interactive Tour</div>
+            `;
+        }
+        
+        function toggleWireframe() {
+            isWireframe = !isWireframe;
+            scene.traverse(child => {
+                if (child.material) {
+                    child.material.wireframe = isWireframe;
+                }
+            });
+        }
+        
+        function autoTour() {
+            if (autoTourActive) return;
+            
+            autoTourActive = true;
+            tourStep = 0;
+            
+            function nextPosition() {
+                if (tourStep >= positions.length) {
+                    autoTourActive = false;
+                    resetView();
+                    return;
+                }
+                
+                const pos = positions[tourStep];
+                showPositionInfo(pos);
+                focusOnPosition(pos);
+                tourStep++;
+                
+                setTimeout(nextPosition, 3000);
+            }
+            
+            nextPosition();
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Gentle rotation of interactive spheres
+            workstations.forEach((ws, index) => {
+                ws.sphere.rotation.y += 0.01 + (index * 0.002);
+            });
+            
+            renderer.render(scene, camera);
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // Initialize when page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
